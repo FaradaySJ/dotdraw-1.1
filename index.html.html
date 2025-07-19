@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DotDraw - 점자 그림 툴</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(24, 16px);
+      grid-auto-rows: 16px;
+      gap: 2px;
+      margin-bottom: 20px;
+      max-height: 90vh;
+      overflow-y: auto;
+      touch-action: none;
+    }
+    .cell {
+      width: 16px;
+      height: 16px;
+      border: 1px solid #ccc;
+      text-align: center;
+      line-height: 16px;
+      font-size: 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .active {
+      background: black;
+      color: white;
+    }
+    textarea {
+      width: 100%;
+      max-width: 600px;
+      height: 200px;
+      font-size: 14px;
+    }
+    button {
+      margin: 5px;
+    }
+    .toolbar {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>DotDraw - 점자 그림 만들기</h1>
+  <div class="toolbar">
+    <button onclick="setMode('pen')">펜 모드</button>
+    <button onclick="setMode('eraser')">지우개 모드</button>
+    <button onclick="generateBraille()">점자 텍스트 생성</button>
+  </div>
+  <div class="grid" id="grid"></div>
+  <textarea id="output" readonly></textarea>
+  <script>
+    const cols = 24;
+    const rows = 100;
+    const grid = document.getElementById("grid");
+    const output = document.getElementById("output");
+
+    let isDrawing = false;
+    let currentMode = 'pen';
+    const state = Array.from({ length: rows }, () => Array(cols).fill(false));
+
+    function setMode(mode) {
+      currentMode = mode;
+    }
+
+    function handleCell(x, y, div) {
+      if (currentMode === 'pen') {
+        state[y][x] = true;
+        div.classList.add("active");
+      } else if (currentMode === 'eraser') {
+        state[y][x] = false;
+        div.classList.remove("active");
+      }
+    }
+
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const div = document.createElement("div");
+        div.className = "cell";
+        div.dataset.x = x;
+        div.dataset.y = y;
+
+        const apply = (e) => {
+          const cx = parseInt(div.dataset.x);
+          const cy = parseInt(div.dataset.y);
+          handleCell(cx, cy, div);
+        };
+
+        div.addEventListener('mousedown', (e) => {
+          isDrawing = true;
+          apply(e);
+        });
+        div.addEventListener('mouseenter', (e) => {
+          if (isDrawing) apply(e);
+        });
+        div.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          isDrawing = true;
+          apply(e);
+        });
+        div.addEventListener('touchmove', (e) => {
+          e.preventDefault();
+          const touch = e.touches[0];
+          const target = document.elementFromPoint(touch.clientX, touch.clientY);
+          if (target && target.classList.contains('cell')) {
+            const cx = parseInt(target.dataset.x);
+            const cy = parseInt(target.dataset.y);
+            handleCell(cx, cy, target);
+          }
+        });
+        grid.appendChild(div);
+      }
+    }
+
+    document.addEventListener('mouseup', () => isDrawing = false);
+    document.addEventListener('touchend', () => isDrawing = false);
+
+    function generateBraille() {
+      const brailleBase = 0x2800;
+      const result = [];
+
+      for (let y = 0; y < rows; y += 4) {
+        let line = "";
+        for (let x = 0; x < cols; x += 2) {
+          let bits = 0;
+          if (state[y]?.[x]) bits |= 1 << 0;
+          if (state[y + 1]?.[x]) bits |= 1 << 1;
+          if (state[y + 2]?.[x]) bits |= 1 << 2;
+          if (state[y]?.[x + 1]) bits |= 1 << 3;
+          if (state[y + 1]?.[x + 1]) bits |= 1 << 4;
+          if (state[y + 2]?.[x + 1]) bits |= 1 << 5;
+          if (state[y + 3]?.[x]) bits |= 1 << 6;
+          if (state[y + 3]?.[x + 1]) bits |= 1 << 7;
+          line += String.fromCharCode(brailleBase + bits);
+        }
+        result.push(line);
+      }
+
+      output.value = result.join("\n");
+    }
+  </script>
+</body>
+</html>
